@@ -1,0 +1,13 @@
+# Optional: build a self-contained receiver image (the lab manifests do not need
+# it, they install dependencies with an init container). Hummingbird images:
+# the -builder variant has pip and a shell, the runtime variant is distroless.
+FROM quay.io/hummingbird/python:3.13-builder AS build
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --target /deps -r /tmp/requirements.txt
+
+FROM quay.io/hummingbird/python:3.13
+COPY --from=build /deps /deps
+COPY app.py /app/app.py
+ENV PYTHONPATH=/deps TLS_CERT=/certs/tls.crt TLS_KEY=/certs/tls.key
+EXPOSE 8443
+CMD ["python3", "/app/app.py"]

@@ -1,0 +1,6 @@
+# Working files created by README 3.3 and 3.6 (cluster-specific config)
+platform-alertmanager/backup/
+platform-alertmanager/alertmanager.yaml
+
+.DS_Store
+__pycache__/

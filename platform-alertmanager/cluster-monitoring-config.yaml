@@ -1,0 +1,14 @@
+# For a cluster that has NO cluster-monitoring-config ConfigMap yet (README 3.5).
+# When the ConfigMap already exists, edit it instead (README 3.5).
+# Mounts Secret am-oauth2 into the alertmanager-main pods under
+# /etc/alertmanager/secrets/am-oauth2/.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+data:
+  config.yaml: |
+    alertmanagerMain:
+      secrets:
+        - am-oauth2

@@ -1,0 +1,21 @@
+# Token server (Keycloak) + JWT-validating webhook receiver.
+# Prerequisite: Secret keycloak-lab in am-oauth2-lab (see README 3.1).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: am-oauth2-lab
+
+resources:
+  - namespace.yaml
+  - keycloak.yaml
+  - receiver.yaml
+
+# Hash suffix on generated ConfigMaps: editing app.py or the realm and
+# re-running `oc apply -k lab/` rolls the pods automatically.
+configMapGenerator:
+  - name: keycloak-realm
+    files:
+      - keycloak/realm-monitoring.json
+  - name: webhook-receiver-app
+    files:
+      - receiver/app.py
+      - receiver/requirements.txt

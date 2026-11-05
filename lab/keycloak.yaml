@@ -1,0 +1,87 @@
+# Token server: Keycloak start-dev over HTTPS, certificate issued by the
+# OpenShift service CA. Realm "monitoring" is imported at startup from the
+# keycloak-realm ConfigMap; client secrets come from Secret keycloak-lab and are
+# substituted into the import (${OCP_ALLOWED_CLIENT_SECRET}, ...).
+# No Hummingbird image exists for Keycloak: upstream image is used.
+# start-dev keeps data in the container (H2): a restart re-imports the realm.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: keycloak-tls
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - name: https
+      port: 8443
+      targetPort: 8443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.4
+          args: ["start-dev", "--import-realm"]
+          env:
+            # Fixed issuer (iss): the receiver validates exactly this value.
+            - name: KC_HOSTNAME
+              value: https://keycloak.am-oauth2-lab.svc:8443
+            - name: KC_HTTP_ENABLED
+              value: "false"
+            - name: KC_HTTPS_CERTIFICATE_FILE
+              value: /certs/tls.crt
+            - name: KC_HTTPS_CERTIFICATE_KEY_FILE
+              value: /certs/tls.key
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: admin
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: keycloak-lab, key: admin-password}
+            - name: OCP_ALLOWED_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: {name: keycloak-lab, key: ocp-allowed-client-secret}
+            - name: OCP_NOT_ALLOWED_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: {name: keycloak-lab, key: ocp-not-allowed-client-secret}
+          ports:
+            - name: https
+              containerPort: 8443
+            - name: management
+              containerPort: 9000
+          readinessProbe:
+            httpGet: {path: /health/ready, port: 9000, scheme: HTTPS}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /health/live, port: 9000, scheme: HTTPS}
+            initialDelaySeconds: 90
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 200m, memory: 512Mi}
+            limits: {memory: 1Gi}
+          volumeMounts:
+            - {name: tls, mountPath: /certs, readOnly: true}
+            - {name: realm, mountPath: /opt/keycloak/data/import, readOnly: true}
+      volumes:
+        - name: tls
+          secret: {secretName: keycloak-tls}
+        - name: realm
+          configMap: {name: keycloak-realm}

@@ -1,0 +1,85 @@
+# JWT-validating webhook receiver on Hummingbird images, no custom build:
+# - init container (python -builder variant, has pip) installs PyJWT into an
+#   emptyDir;
+# - main container (distroless python runtime) runs app.py from a ConfigMap.
+# Needs egress to PyPI (or a PIP_INDEX_URL mirror) at pod start.
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-receiver
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: webhook-receiver-tls
+spec:
+  selector:
+    app: webhook-receiver
+  ports:
+    - name: https
+      port: 8443
+      targetPort: 8443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-receiver
+  labels:
+    app: webhook-receiver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhook-receiver
+  template:
+    metadata:
+      labels:
+        app: webhook-receiver
+    spec:
+      initContainers:
+        - name: pip-install
+          image: quay.io/hummingbird/python:3.13-builder
+          command: ["pip", "install", "--no-cache-dir", "--target", "/deps", "-r", "/app/requirements.txt"]
+          env:
+            - {name: HOME, value: /tmp}
+          volumeMounts:
+            - {name: deps, mountPath: /deps}
+            - {name: app, mountPath: /app, readOnly: true}
+      containers:
+        - name: receiver
+          image: quay.io/hummingbird/python:3.13
+          command: ["python3", "/app/app.py"]
+          env:
+            - name: PYTHONPATH
+              value: /deps
+            - name: OIDC_ISSUER
+              value: https://keycloak.am-oauth2-lab.svc:8443/realms/monitoring
+            # Service CA bundle, injected by OpenShift into every pod.
+            - name: OIDC_CA_FILE
+              value: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            - name: OIDC_AUDIENCE
+              value: alert-collector
+            - name: REQUIRED_SCOPE
+              value: alerting
+            - name: ALLOWED_CLIENTS
+              value: ocp-allowed
+            # strict | tolerant (migration mode, see README 3.10 and 7.1)
+            - name: AUTH_MODE
+              value: strict
+          ports:
+            - name: https
+              containerPort: 8443
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8443, scheme: HTTPS}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 20m, memory: 48Mi}
+            limits: {memory: 192Mi}
+          volumeMounts:
+            - {name: deps, mountPath: /deps, readOnly: true}
+            - {name: app, mountPath: /app, readOnly: true}
+            - {name: tls, mountPath: /certs, readOnly: true}
+      volumes:
+        - name: deps
+          emptyDir: {}
+        - name: app
+          configMap: {name: webhook-receiver-app}
+        - name: tls
+          secret: {secretName: webhook-receiver-tls}
