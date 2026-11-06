@@ -861,7 +861,6 @@ the config automatically.
 
 ## Sources
 
-- [Red Hat, AlertmanagerConfig v1beta1 (OCP 4.18)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/monitoring_apis/alertmanagerconfig-monitoring-coreos-com-v1beta1)
-- [Red Hat Bugzilla 2097716, httpConfig/oauth2 in AlertmanagerConfig](https://bugzilla.redhat.com/show_bug.cgi?id=2097716)
+- [Red Hat, AlertmanagerConfig v1beta1 (OCP 4.20)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/monitoring_apis/alertmanagerconfig-monitoring-coreos-com-v1beta1#spec-receivers-webhookconfigs-httpconfig-oauth2)
 - [Alertmanager configuration schema, oauth2 block](https://www.schemastore.org/prometheus-alertmanager.json)
 - [Project Hummingbird images](https://quay.io/organization/hummingbird)
